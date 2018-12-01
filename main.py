@@ -1,10 +1,8 @@
 import argparse
-
 import pandas as pd
 import numpy as np
 from collections import OrderedDict
 import stadistics
-import math as m
 import warnings
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
 
@@ -13,6 +11,7 @@ def parseargsinput():
     parser = argparse.ArgumentParser(description='Bayers network', prog='Bayers network')
     parser.add_argument('-p', help='Path of data', required=True)
     parser.add_argument('-ho', help='Train HOLD-OUT', required=False)
+    parser.add_argument('-ls', help='Laplace smoothing', action='store_true', required=False)
 
     args = parser.parse_args()
     return vars(args)
@@ -102,6 +101,30 @@ def classify(tweet, table, positives, negatives):
     # return 1
 
 
+def laplaceSmoothing(tweet, aux_dic, total_p, total_n):
+
+    alpha = 1
+    contador0 = 0
+    contador1 = 0
+
+    for word in tweet.split():
+        if word in aux_dic:
+            var_n = aux_dic[word][2]
+            var_p = aux_dic[word][1]
+        else:
+            var_n = 0
+            var_p = 0
+        var1 = np.log((var_n + alpha) / float(total_n + (alpha * len(aux_dic))))
+        var2 = np.log((var_p + alpha) / float(total_p + (alpha * len(aux_dic))))
+        contador0 += var1
+        contador1 += var2
+
+    if contador0 > contador1:
+        return 0
+    else:
+        return 1
+
+
 def mesure(predicted, real):
     print '-----------------------------------'
     print "Accuracy: ", accuracy_score(predicted, real)
@@ -130,49 +153,84 @@ def main():
     # =============   Validacion   =====================================
     # *******************************************************************
 
-    c_ok, c_fail = 0, 0
-    predicted, real = [], []
+    if not d['ls']:
+        c_ok, c_fail = 0, 0
+        predicted, real = [], []
 
-    print '>>> Naive Bayes'
-    print 'Validando conjunto de train...'
+        print '>>> Naive Bayes'
+        print 'Validando conjunto de train...'
 
-    y_valuestrain = train[:, 3]
+        for i in range(len(train)):
+            u = classify(train[i][1], table, positives, negatives)
+            predicted.append(u)
+            real.append(int(train[i][3]))
+            if u == int(train[i][3]):
+                c_ok += 1
+            else:
+                c_fail += 1
 
-    for i in range(len(train)):
-        u = classify(train[i][1], table, positives, negatives)
-        predicted.append(u)
-        real.append(int(train[i][3]))
-        if u == int(train[i][3]):
-            c_ok += 1
-        else:
-            c_fail += 1
+        print '----> Train <----'
+        print 'Ok:', c_ok, '     Fail:', c_fail, '        (Total:', c_ok + c_fail, ')'
+        print str((c_ok / float(c_ok + c_fail)) * 100), '%'
+        mesure(predicted, real)
 
-    print '----> Train <----'
-    print 'Ok:', c_ok, '     Fail:', c_fail, '        (Total:', c_ok + c_fail, ')'
-    print str((c_ok / float(c_ok + c_fail)) * 100), '%'
-    mesure(predicted, real)
+        print '\n\nValidando conjunto de test...'
+        c_ok, c_fail = 0, 0
+        predicted, real = [], []
 
-    print '\n\nValidando conjunto de test...'
-    c_ok, c_fail = 0, 0
-    predicted, real = [], []
+        for i in range(len(test)):
+            u = classify(test[i][1], table, positives, negatives)
+            predicted.append(u)
+            real.append(int(test[i][3]))
+            if u == int(test[i][3]):
+                c_ok += 1
+            else:
+                c_fail += 1
 
-    y_valuestest = test[:, 3]
+        print '----> Test <----'
+        print 'Ok:', c_ok, '     Fail:', c_fail, '        (Total:', c_ok + c_fail, ')'
+        print str((c_ok / float(c_ok + c_fail)) * 100), '%'
+        mesure(predicted, real)
+        print '\n'
+    else:
+        c_ok, c_fail = 0, 0
+        predicted, real = [], []
 
-    for i in range(len(test)):
-        u = classify(test[i][1], table, positives, negatives)
-        predicted.append(u)
-        real.append(int(test[i][3]))
-        if u == int(test[i][3]):
-            c_ok += 1
-        else:
-            c_fail += 1
+        print '>>> Laplace Smoothing'
+        print 'Validando conjunto de train...'
 
-    print '----> Test <----'
-    print 'Ok:', c_ok, '     Fail:', c_fail, '        (Total:', c_ok + c_fail, ')'
-    print str((c_ok / float(c_ok + c_fail)) * 100), '%'
-    mesure(predicted, real)
-    print '\n'
+        for i in range(len(train)):
+            u = laplaceSmoothing(train[i][1], table, positives, negatives)
+            predicted.append(u)
+            real.append(int(train[i][3]))
+            if u == int(train[i][3]):
+                c_ok += 1
+            else:
+                c_fail += 1
 
+        print '----> Train <----'
+        print 'Ok:', c_ok, '     Fail:', c_fail, '        (Total:', c_ok + c_fail, ')'
+        print str((c_ok / float(c_ok + c_fail)) * 100), '%'
+        mesure(predicted, real)
+
+        print '\n\nValidando conjunto de test...'
+        c_ok, c_fail = 0, 0
+        predicted, real = [], []
+
+        for i in range(len(test)):
+            u = laplaceSmoothing(test[i][1], table, positives, negatives)
+            predicted.append(u)
+            real.append(int(test[i][3]))
+            if u == int(test[i][3]):
+                c_ok += 1
+            else:
+                c_fail += 1
+
+        print '----> Test <----'
+        print 'Ok:', c_ok, '     Fail:', c_fail, '        (Total:', c_ok + c_fail, ')'
+        print str((c_ok / float(c_ok + c_fail)) * 100), '%'
+        mesure(predicted, real)
+        print '\n'
 
 if __name__ == '__main__':
     main()
